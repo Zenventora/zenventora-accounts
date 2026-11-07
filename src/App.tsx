@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { ArrowRight, BadgeCheck, CheckCircle2, ChevronRight, CircleHelp, Eye, EyeOff, Fingerprint, Globe2, KeyRound, LockKeyhole, LogOut, Mail, Menu, Monitor, Pencil, Phone, Save, Shield, ShieldCheck, UserRound, Building2, X, XCircle } from "lucide-react";
+import { ArrowRight, BadgeCheck, CheckCircle2, ChevronRight, CircleHelp, Eye, EyeOff, Globe2, KeyRound, LockKeyhole, LogOut, Mail, Menu, Monitor, Pencil, Phone, Save, Shield, ShieldCheck, UserRound, Building2, X, XCircle } from "lucide-react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
 
 type View = "signin" | "signup" | "forgot" | "verify" | "reset" | "dashboard";
