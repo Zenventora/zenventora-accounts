@@ -14,7 +14,7 @@ A standalone identity and sign-in portal for ZenVentora products.
 3. Run `npm install`, then `npm run dev`.
 
 ## Supabase dashboard setup still required
-- Authentication > URL Configuration: set the production Site URL to `https://accounts.zenventora.in`; allow the production callback URLs `https://accounts.zenventora.in/auth/callback` and `https://accounts.zenventora.in/reset-password`, plus the Render preview URL during initial testing.
+- Authentication > URL Configuration: set the production Site URL to `https://accounts.zenventora.in`; allow the production Site URL and the Render preview URL during initial testing. OAuth and recovery redirects return to the site root, so no nested static routes are required.
 - Authentication > Providers > Google: enable Google and add the Google OAuth client ID and secret. Add the Supabase callback URL shown in the provider settings to the Google Cloud OAuth client.
 - Authentication > Email: configure confirmation and password recovery email templates. For the 6-digit code screen, use the Supabase email OTP variable `{{ .Token }}`; if using the default confirmation link, users can open the link and return to the callback route.
 - Configure a custom SMTP provider only after obtaining SMTP credentials from the verified sending domain provider. Never put SMTP credentials or service-role keys in this frontend.
