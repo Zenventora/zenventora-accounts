@@ -24,8 +24,6 @@ export default function App() {
       if (!alive) return;
       setSession(data.session);
       if (data.session) setView("dashboard");
-      else if (window.location.pathname === "/reset-password") setView("reset");
-      else if (window.location.pathname === "/auth/callback") setNotice({ type: "success", text: "Your email sign-in has been confirmed. You can now sign in." });
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
@@ -56,7 +54,7 @@ export default function App() {
     void run(async () => {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(), password,
-        options: { data: { full_name: fullName.trim() }, emailRedirectTo: window.location.origin + "/auth/callback" }
+        options: { data: { full_name: fullName.trim() }, emailRedirectTo: window.location.origin }
       });
       if (error) throw error;
       if (data.session) setView("dashboard");
@@ -83,7 +81,7 @@ export default function App() {
   const sendReset = (e: FormEvent) => {
     e.preventDefault();
     void run(async () => {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin + "/reset-password" });
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
       if (error) throw error;
       setNotice({ type: "success", text: "If an account exists for this email, a password reset link has been sent." });
     });
@@ -100,7 +98,7 @@ export default function App() {
   };
 
   const googleSignIn = () => void run(async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + "/auth/callback" } });
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
     if (error) throw error;
   });
 
