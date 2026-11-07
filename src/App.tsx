@@ -1,153 +1,87 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, Fingerprint, KeyRound, LoaderCircle, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound, XCircle } from "lucide-react";
+import { ArrowRight, BadgeCheck, CheckCircle2, ChevronRight, CircleHelp, Eye, EyeOff, Globe2, KeyRound, LockKeyhole, LogOut, Mail, Menu, Monitor, Pencil, Phone, Save, Shield, ShieldCheck, UserRound, Building2, X, XCircle } from "lucide-react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
 
 type View = "signin" | "signup" | "forgot" | "verify" | "reset" | "dashboard";
-type Notice = { type: "success" | "error" | "info"; text: string } | null;
+type Tab = "profile" | "email" | "security" | "sessions" | "privacy";
+type Notice = { type: "success" | "error"; text: string } | null;
+const LOGO = "https://zenventora.in/assets/zenventora-logo.svg";
 
 export default function App() {
-  const [view, setView] = useState<View>("signin");
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
-  const [email, setEmail] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [view,setView]=useState<View>("signin"),[tab,setTab]=useState<Tab>("profile");
+  const [session,setSession]=useState<Session|null>(null),[loading,setLoading]=useState(false),[notice,setNotice]=useState<Notice>(null);
+  const [email,setEmail]=useState(""),[fullName,setFullName]=useState(""),[password,setPassword]=useState(""),[otp,setOtp]=useState(""),[showPassword,setShowPassword]=useState(false);
+  const [company,setCompany]=useState(""),[phone,setPhone]=useState(""),[editing,setEditing]=useState(false),[newEmail,setNewEmail]=useState(""),[newPassword,setNewPassword]=useState(""),[confirmPassword,setConfirmPassword]=useState(""),[mobileNav,setMobileNav]=useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!alive) return;
-      setSession(data.session);
-      if (data.session) setView("dashboard");
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      setSession(nextSession);
-      if (event === "PASSWORD_RECOVERY") setView("reset");
-      else if (nextSession && event !== "TOKEN_REFRESHED") setView("dashboard");
-    });
-    return () => { alive = false; listener.subscription.unsubscribe(); };
-  }, []);
+  useEffect(()=>{let alive=true;supabase.auth.getSession().then(({data})=>{if(!alive)return;setSession(data.session);if(data.session)setView("dashboard");});const {data:listener}=supabase.auth.onAuthStateChange((event,next)=>{setSession(next);if(event==="PASSWORD_RECOVERY")setView("reset");else if(next&&event!=="TOKEN_REFRESHED")setView("dashboard");});return()=>{alive=false;listener.subscription.unsubscribe();};},[]);
+  useEffect(()=>{if(!session?.user)return;const m=session.user.user_metadata||{};setFullName(m.full_name||m.name||"");setCompany(m.company_name||"");setPhone(m.phone_number||"");setNewEmail(session.user.email||"");},[session?.user.id,session?.user.user_metadata]);
+  const run=async(action:()=>Promise<void>)=>{setLoading(true);setNotice(null);try{await action();}catch(e){setNotice({type:"error",text:e instanceof Error?e.message:"Something went wrong. Please try again."});}finally{setLoading(false);}};
+  const refresh=async()=>{const {data}=await supabase.auth.getSession();setSession(data.session);};
+  const signIn=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(error)throw error;});};
+  const signUp=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {data,error}=await supabase.auth.signUp({email:email.trim(),password,options:{data:{full_name:fullName.trim()},emailRedirectTo:window.location.origin}});if(error)throw error;if(data.session)setView("dashboard");else{setView("verify");setNotice({type:"success",text:"We sent a confirmation email. Enter the 8-digit code from your inbox."});}});};
+  const verify=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:"signup"});if(error)throw error;await refresh();setView("dashboard");setNotice({type:"success",text:"Email verified successfully."});});};
+  const resend=()=>void run(async()=>{const {error}=await supabase.auth.resend({type:"signup",email:email.trim(),options:{emailRedirectTo:window.location.origin}});if(error)throw error;setNotice({type:"success",text:"A new confirmation email has been sent."});});
+  const forgot=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin});if(error)throw error;setNotice({type:"success",text:"If an account exists for this email, a reset link has been sent."});});};
+  const reset=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.updateUser({password});if(error)throw error;await refresh();setView("dashboard");setNotice({type:"success",text:"Password updated successfully."});});};
+  const google=()=>void run(async()=>{const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});if(error)throw error;});
+  const saveProfile=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.updateUser({data:{full_name:fullName.trim(),company_name:company.trim(),phone_number:phone.trim()}});if(error)throw error;await refresh();setEditing(false);setNotice({type:"success",text:"Profile information updated."});});};
+  const updateEmail=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.updateUser({email:newEmail.trim()});if(error)throw error;setNotice({type:"success",text:"A confirmation link has been sent. Your email changes after you confirm it."});});};
+  const updatePassword=(e:FormEvent)=>{e.preventDefault();void run(async()=>{if(newPassword.length<8)throw new Error("Use at least 8 characters.");if(newPassword!==confirmPassword)throw new Error("The passwords do not match.");const {error}=await supabase.auth.updateUser({password:newPassword});if(error)throw error;setNewPassword("");setConfirmPassword("");setNotice({type:"success",text:"Password changed successfully."});});};
+  const logout=(global=false)=>void run(async()=>{const {error}=await supabase.auth.signOut(global?{scope:"global"}:undefined);if(error)throw error;setSession(null);setPassword("");setView("signin");setTab("profile");setNotice({type:"success",text:global?"All sessions signed out.":"You have been signed out."});});
+  const switchView=(v:View)=>{setNotice(null);setPassword("");setView(v);};
+  const switchTab=(v:Tab)=>{setNotice(null);setTab(v);setEditing(false);setMobileNav(false);};
 
-  const run = async (action: () => Promise<void>) => {
-    setLoading(true); setNotice(null);
-    try { await action(); }
-    catch (error) {
-      setNotice({ type: "error", text: error instanceof Error ? error.message : "Something went wrong. Please try again." });
-    } finally { setLoading(false); }
-  };
+  if(!supabaseConfigured)return <AuthShell><div className="config-card"><Brand/><p className="eyebrow">SETUP REQUIRED</p><h1>Connect your account service</h1><p>Add the Supabase project URL and publishable key to Render, then redeploy.</p><code>VITE_SUPABASE_URL</code><code>VITE_SUPABASE_ANON_KEY</code></div></AuthShell>;
+  if(session&&view==="dashboard")return <AccountShell session={session} tab={tab} setTab={switchTab} notice={notice} clearNotice={()=>setNotice(null)} mobileNav={mobileNav} setMobileNav={setMobileNav} logout={()=>logout(false)}>
+    {tab==="profile"&&<ProfilePanel session={session} fullName={fullName} setFullName={setFullName} company={company} setCompany={setCompany} phone={phone} setPhone={setPhone} editing={editing} setEditing={setEditing} onSave={saveProfile} loading={loading}/>}
+    {tab==="email"&&<EmailPanel session={session} value={newEmail} setValue={setNewEmail} onSubmit={updateEmail} loading={loading}/>}
+    {tab==="security"&&<SecurityPanel password={newPassword} setPassword={setNewPassword} confirm={confirmPassword} setConfirm={setConfirmPassword} onSubmit={updatePassword} loading={loading}/>}
+    {tab==="sessions"&&<SessionsPanel session={session} onLogout={()=>logout(true)} loading={loading}/>}
+    {tab==="privacy"&&<PrivacyPanel/>}
+  </AccountShell>;
 
-  const signIn = (e: FormEvent) => {
-    e.preventDefault();
-    void run(async () => {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (error) throw error;
-    });
-  };
-
-  const signUp = (e: FormEvent) => {
-    e.preventDefault();
-    void run(async () => {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(), password,
-        options: { data: { full_name: fullName.trim() }, emailRedirectTo: window.location.origin }
-      });
-      if (error) throw error;
-      if (data.session) setView("dashboard");
-      else { setView("verify"); setNotice({ type: "success", text: "We sent a confirmation email. Open it to verify your address, or enter the 6-digit code if your email contains one." }); }
-    });
-  };
-
-  const verifyEmail = (e: FormEvent) => {
-    e.preventDefault();
-    void run(async () => {
-      const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: otp.trim(), type: "signup" });
-      if (error) throw error;
-      setNotice({ type: "success", text: "Email verified successfully." });
-      setView("dashboard");
-    });
-  };
-
-  const resendVerification = () => void run(async () => {
-    const { error } = await supabase.auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo: window.location.origin + "/auth/callback" } });
-    if (error) throw error;
-    setNotice({ type: "success", text: "A new confirmation email has been sent." });
-  });
-
-  const sendReset = (e: FormEvent) => {
-    e.preventDefault();
-    void run(async () => {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
-      if (error) throw error;
-      setNotice({ type: "success", text: "If an account exists for this email, a password reset link has been sent." });
-    });
-  };
-
-  const updatePassword = (e: FormEvent) => {
-    e.preventDefault();
-    void run(async () => {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
-      setNotice({ type: "success", text: "Password updated. Your account is ready." });
-      setView("dashboard");
-    });
-  };
-
-  const googleSignIn = () => void run(async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
-    if (error) throw error;
-  });
-
-  const signOut = () => void run(async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setPassword(""); setSession(null); setView("signin");
-    setNotice({ type: "success", text: "You have been signed out." });
-  });
-
-  const switchView = (next: View) => { setNotice(null); setPassword(""); setView(next); };
-
-  if (!supabaseConfigured) return <Shell><div className="config-card"><div className="brand-mark"><Fingerprint size={25} /></div><p className="eyebrow">SETUP REQUIRED</p><h1>Connect your account service</h1><p className="muted">Add the Supabase project URL and publishable key to the Render environment, then redeploy this site.</p><code>VITE_SUPABASE_URL</code><code>VITE_SUPABASE_ANON_KEY</code></div></Shell>;
-
-  if ((session && view !== "reset") || view === "dashboard") return <Shell><div className="dashboard-card"><div className="brand-mark"><ShieldCheck size={26} /></div><p className="eyebrow">ZENVENTORA ACCOUNT</p><h1>You're signed in.</h1><p className="muted">Your central account is ready. You can use this identity across connected ZenVentora products as they are integrated.</p><div className="identity"><span className="avatar"><UserRound size={19} /></span><div><strong>{session?.user.user_metadata.full_name || session?.user.user_metadata.name || "ZenVentora user"}</strong><span>{session?.user.email}</span></div><CheckCircle2 className="verified" size={20} /></div><button className="primary full" onClick={signOut} disabled={loading}>{loading ? <LoaderCircle className="spin" size={18}/> : "Sign out"}</button></div></Shell>;
-
-  return <Shell><section className="auth-card">
-    <div className="brand-row"><div className="brand-mark"><Fingerprint size={25}/></div><span>ZENVENTORA</span><span className="brand-divider">/</span><span className="brand-sub">ACCOUNTS</span></div>
-    <div className="intro"><div className="eyebrow"><Sparkles size={13}/> ONE ACCOUNT. CONNECTED WORK.</div>
-      <h1>{view === "signup" ? "Create your account." : view === "forgot" ? "Reset your password." : view === "verify" ? "Check your inbox." : view === "reset" ? "Choose a new password." : "Welcome back."}</h1>
-      <p className="muted">{view === "signup" ? "Create your ZenVentora identity to get started." : view === "forgot" ? "We'll send you a secure link to reset your password." : view === "verify" ? "Verify your email address to secure your account." : view === "reset" ? "Use a strong password you haven't used before." : "Sign in to continue to your ZenVentora workspace."}</p>
-    </div>
-
-    {notice && <div className={`notice ${notice.type}`}>{notice.type === "error" ? <XCircle size={17}/> : <CheckCircle2 size={17}/>}<span>{notice.text}</span></div>}
-
-    {view === "signin" && <><button className="google-button" onClick={googleSignIn} disabled={loading}><GoogleMark/>Continue with Google</button><div className="separator"><span>or continue with email</span></div><form onSubmit={signIn}>
-      <Field label="Email address" icon={<Mail size={17}/>}><input type="email" autoComplete="email" placeholder="you@company.com" value={email} onChange={e=>setEmail(e.target.value)} required/></Field>
-      <Field label="Password" icon={<LockKeyhole size={17}/>}><div className="password-wrap"><input type={showPassword?"text":"password"} autoComplete="current-password" placeholder="Enter your password" value={password} onChange={e=>setPassword(e.target.value)} required/><button type="button" className="eye" onClick={()=>setShowPassword(!showPassword)} aria-label="Toggle password visibility">{showPassword?<EyeOff size={17}/>:<Eye size={17}/>}</button></div></Field>
-      <div className="form-meta"><button type="button" className="text-button" onClick={()=>switchView("forgot")}>Forgot password?</button></div>
-      <button className="primary full" disabled={loading}>{loading?<LoaderCircle className="spin" size={18}/>:<>Sign in <ArrowRight size={17}/></>}</button>
-    </form><p className="switch-copy">New to ZenVentora? <button className="text-button" onClick={()=>switchView("signup")}>Create an account</button></p></>}
-
-    {view === "signup" && <><form onSubmit={signUp}>
-      <Field label="Full name" icon={<UserRound size={17}/>}><input autoComplete="name" placeholder="Your name" value={fullName} onChange={e=>setFullName(e.target.value)} required/></Field>
-      <Field label="Email address" icon={<Mail size={17}/>}><input type="email" autoComplete="email" placeholder="you@company.com" value={email} onChange={e=>setEmail(e.target.value)} required/></Field>
-      <Field label="Create password" icon={<LockKeyhole size={17}/>}><div className="password-wrap"><input type={showPassword?"text":"password"} autoComplete="new-password" minLength={8} placeholder="At least 8 characters" value={password} onChange={e=>setPassword(e.target.value)} required/><button type="button" className="eye" onClick={()=>setShowPassword(!showPassword)} aria-label="Toggle password visibility">{showPassword?<EyeOff size={17}/>:<Eye size={17}/>}</button></div></Field>
-      <p className="helper">Use at least 8 characters. Email verification is required.</p>
-      <button className="primary full" disabled={loading}>{loading?<LoaderCircle className="spin" size={18}/>:<>Create account <ArrowRight size={17}/></>}</button>
-    </form><p className="switch-copy">Already have an account? <button className="text-button" onClick={()=>switchView("signin")}>Sign in</button></p></>}
-
-    {view === "verify" && <form onSubmit={verifyEmail}><Field label="Email address" icon={<Mail size={17}/>}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} required/></Field><Field label="8-digit verification code" icon={<KeyRound size={17}/>}><input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8} minLength={8} pattern="[0-9]{8}" placeholder="00000000" value={otp} onChange={e=>setOtp(e.target.value.replace(/\\D/g,"").slice(0,8))} required/></Field><button className="primary full" disabled={loading}>{loading?<LoaderCircle className="spin" size={18}/>:<>Verify email <ArrowRight size={17}/></>}</button><button type="button" className="secondary full" onClick={resendVerification} disabled={loading}>Resend confirmation email</button><button type="button" className="back-button" onClick={()=>switchView("signin")}><ArrowLeft size={15}/> Back to sign in</button></form>}
-
-    {view === "forgot" && <form onSubmit={sendReset}><Field label="Email address" icon={<Mail size={17}/>}><input type="email" autoComplete="email" placeholder="you@company.com" value={email} onChange={e=>setEmail(e.target.value)} required/></Field><button className="primary full" disabled={loading}>{loading?<LoaderCircle className="spin" size={18}/>:<>Send reset link <ArrowRight size={17}/></>}</button><button type="button" className="back-button" onClick={()=>switchView("signin")}><ArrowLeft size={15}/> Back to sign in</button></form>}
-
-    {view === "reset" && <form onSubmit={updatePassword}><Field label="New password" icon={<LockKeyhole size={17}/>}><input type="password" autoComplete="new-password" minLength={8} placeholder="At least 8 characters" value={password} onChange={e=>setPassword(e.target.value)} required/></Field><button className="primary full" disabled={loading}>{loading?<LoaderCircle className="spin" size={18}/>:<>Update password <ArrowRight size={17}/></>}</button></form>}
-    <div className="security-note"><ShieldCheck size={15}/> Secure authentication powered by Supabase</div>
-  </section><footer>© {new Date().getFullYear()} ZenVentora <span>·</span> Built for connected business</footer></Shell>;
+  return <AuthShell><section className="auth-layout">
+    <aside className="auth-aside"><Brand light/><div className="aside-copy"><span className="aside-kicker">✦ ONE IDENTITY. EVERY CONNECTION.</span><h2>Your business,<br/><em>beautifully connected.</em></h2><p>One secure ZenVentora account to access the tools, services and experiences built around your business.</p></div><div className="aside-bottom"><div className="aside-proof"><ShieldCheck size={19}/><span><strong>Secure by design</strong><small>Your identity stays protected</small></span></div><span className="aside-url">ZENVENTORA.IN <i>·</i> ACCOUNTS</span></div><div className="orb orb-one"/><div className="orb orb-two"/></aside>
+    <section className="auth-main"><div className="mobile-brand"><Brand/></div><div className="auth-card">
+      <div className="auth-heading"><p className="eyebrow">{view==="signup"?"GET STARTED":view==="forgot"||view==="reset"?"ACCOUNT RECOVERY":view==="verify"?"EMAIL VERIFICATION":"WELCOME TO ZENVENTORA"}</p><h1>{view==="signup"?"Create your account":view==="forgot"?"Reset your password":view==="verify"?"Check your inbox":view==="reset"?"Set a new password":"Welcome back"}</h1><p>{view==="signup"?"Set up your identity and get connected.":view==="forgot"?"We'll send a secure reset link to your email.":view==="verify"?"Enter the verification code sent to your email address.":view==="reset"?"Choose a strong password for your account.":"Sign in to continue to your ZenVentora account."}</p></div>
+      {notice&&<Notice notice={notice}/>}
+      {view==="signin"&&<><button className="google-button" onClick={google} disabled={loading}><GoogleMark/>Continue with Google</button><div className="separator"><span>or sign in with email</span></div><form onSubmit={signIn}><Field label="Email address" icon={<Mail size={17}/>}><input type="email" autoComplete="email" placeholder="name@company.com" value={email} onChange={e=>setEmail(e.target.value)} required/></Field><Field label="Password" icon={<LockKeyhole size={17}/>}><Password value={password} setValue={setPassword} visible={showPassword} toggle={()=>setShowPassword(!showPassword)} autoComplete="current-password" placeholder="Enter your password"/></Field><div className="form-meta"><button type="button" className="text-button" onClick={()=>switchView("forgot")}>Forgot password?</button></div><button className="primary full" disabled={loading}>{loading?<Spinner/>:<>Sign in <ArrowRight size={17}/></>}</button></form><p className="switch-copy">New to ZenVentora? <button className="text-button" onClick={()=>switchView("signup")}>Create an account</button></p></>}
+      {view==="signup"&&<form onSubmit={signUp}><Field label="Full name" icon={<UserRound size={17}/>}><input autoComplete="name" placeholder="Your full name" value={fullName} onChange={e=>setFullName(e.target.value)} required/></Field><Field label="Work email" icon={<Mail size={17}/>}><input type="email" autoComplete="email" placeholder="name@company.com" value={email} onChange={e=>setEmail(e.target.value)} required/></Field><Field label="Create password" icon={<LockKeyhole size={17}/>}><Password value={password} setValue={setPassword} visible={showPassword} toggle={()=>setShowPassword(!showPassword)} autoComplete="new-password" placeholder="At least 8 characters"/></Field><p className="helper">Use at least 8 characters. Email verification is required.</p><button className="primary full" disabled={loading}>{loading?<Spinner/>:<>Create account <ArrowRight size={17}/></>}</button><p className="switch-copy">Already have an account? <button className="text-button" type="button" onClick={()=>switchView("signin")}>Sign in</button></p></form>}
+      {view==="verify"&&<form onSubmit={verify}><Field label="Email address" icon={<Mail size={17}/>}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} required/></Field><Field label="8-digit verification code" icon={<KeyRound size={17}/>}><input className="otp-input" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8} minLength={8} pattern="[0-9]{8}" placeholder="00000000" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,8))} required/></Field><button className="primary full" disabled={loading}>{loading?<Spinner/>:<>Verify email <ArrowRight size={17}/></>}</button><button type="button" className="secondary full" onClick={resend} disabled={loading}>Resend confirmation email</button><button type="button" className="back-button" onClick={()=>switchView("signin")}>Back to sign in</button></form>}
+      {view==="forgot"&&<form onSubmit={forgot}><Field label="Email address" icon={<Mail size={17}/>}><input type="email" autoComplete="email" placeholder="name@company.com" value={email} onChange={e=>setEmail(e.target.value)} required/></Field><button className="primary full" disabled={loading}>{loading?<Spinner/>:<>Send reset link <ArrowRight size={17}/></>}</button><button type="button" className="back-button" onClick={()=>switchView("signin")}>Back to sign in</button></form>}
+      {view==="reset"&&<form onSubmit={reset}><Field label="New password" icon={<LockKeyhole size={17}/>}><Password value={password} setValue={setPassword} visible={showPassword} toggle={()=>setShowPassword(!showPassword)} autoComplete="new-password" placeholder="At least 8 characters"/></Field><button className="primary full" disabled={loading}>{loading?<Spinner/>:<>Update password <ArrowRight size={17}/></>}</button></form>}
+      <div className="auth-foot"><ShieldCheck size={15}/> Secure authentication powered by Supabase</div>
+    </div><footer className="auth-footer">© {new Date().getFullYear()} ZenVentora <i>·</i> Built for connected business</footer></section>
+  </section></AuthShell>;
 }
 
-function Shell({children}:{children:React.ReactNode}) { return <main className="page"><div className="ambient ambient-one"/><div className="ambient ambient-two"/><div className="page-content">{children}</div></main>; }
-function Field({label,icon,children}:{label:string;icon:React.ReactNode;children:React.ReactNode}) { return <label className="field"><span className="field-label">{label}</span><span className="input-shell"><span className="input-icon">{icon}</span>{children}</span></label>; }
-function GoogleMark(){return <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.73 7.18l7.65 5.94c4.47-4.13 7.12-10.2 7.12-17.59z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.88.93 7.55 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.81l-7.65-5.94c-2.13 1.43-4.86 2.27-8.25 2.27-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>}
+function Brand({light=false}:{light?:boolean}){return <a className={"brand "+(light?"brand-light":"")} href="https://zenventora.in/"><img src={LOGO} alt="ZenVentora"/><span>ZENVENTORA</span></a>;}
+function AuthShell({children}:{children:ReactNode}){return <main className="auth-page"><div className="auth-glow"/><div className="auth-page-content">{children}</div></main>;}
+function Field({label,icon,children}:{label:string;icon:ReactNode;children:ReactNode}){return <label className="field"><span className="field-label">{label}</span><span className="input-shell"><span className="input-icon">{icon}</span>{children}</span></label>;}
+function Password({value,setValue,visible,toggle,autoComplete,placeholder}:{value:string;setValue:(v:string)=>void;visible:boolean;toggle:()=>void;autoComplete:string;placeholder:string}){return <div className="password-wrap"><input type={visible?"text":"password"} minLength={8} autoComplete={autoComplete} placeholder={placeholder} value={value} onChange={e=>setValue(e.target.value)} required/><button type="button" className="eye" onClick={toggle} aria-label="Toggle password visibility">{visible?<EyeOff size={17}/>:<Eye size={17}/>}</button></div>;}
+function Spinner(){return <span className="spinner"/>;}
+function GoogleMark(){return <svg width="19" height="19" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.73 7.18l7.65 5.94c4.47-4.13 7.12-10.2 7.12-17.59z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.88.93 7.55 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.81l-7.65-5.94c-2.13 1.43-4.86 2.27-8.25 2.27-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>;}
+function Notice({notice}:{notice:Exclude<Notice,null>}){return <div className={"notice "+notice.type}>{notice.type==="error"?<XCircle size={17}/>:<CheckCircle2 size={17}/>}<span>{notice.text}</span></div>;}
+
+function AccountShell({session,tab,setTab,notice,clearNotice,mobileNav,setMobileNav,logout,children}:{session:Session;tab:Tab;setTab:(v:Tab)=>void;notice:Notice;clearNotice:()=>void;mobileNav:boolean;setMobileNav:(v:boolean)=>void;logout:()=>void;children:ReactNode}){
+ const name=session.user.user_metadata.full_name||session.user.user_metadata.name||"ZenVentora user";
+ const items=[{id:"profile" as Tab,label:"Personal information",icon:<UserRound size={18}/>},{id:"email" as Tab,label:"Email addresses",icon:<Mail size={18}/>},{id:"security" as Tab,label:"Security",icon:<Shield size={18}/>},{id:"sessions" as Tab,label:"Sessions",icon:<Monitor size={18}/>},{id:"privacy" as Tab,label:"Privacy",icon:<LockKeyhole size={18}/>}];
+ const titles:Record<Tab,string>={profile:"Profile",email:"Email addresses",security:"Security",sessions:"Sessions",privacy:"Privacy"};
+ const descriptions:Record<Tab,string>={profile:"Manage the personal information associated with your ZenVentora account.",email:"Manage the email address you use to sign in and receive account updates.",security:"Keep your account secure with strong sign-in credentials.",sessions:"Review your active sign-in and manage account access.",privacy:"Understand how your account information is used."};
+ return <main className="account-page"><header className="account-topbar"><button className="mobile-menu" onClick={()=>setMobileNav(!mobileNav)} aria-label="Toggle menu"><Menu size={20}/></button><Brand/><div className="topbar-actions"><a href="https://zenventora.in/">Visit website <Globe2 size={15}/></a><span className="top-avatar">{initials(name)}</span><strong>{name}</strong><button onClick={logout}><LogOut size={16}/> Sign out</button></div></header><div className="account-layout"><aside className={"account-sidebar "+(mobileNav?"open":"")}><p className="sidebar-caption">ACCOUNT SETTINGS</p><p className="sidebar-label">PROFILE</p>{items.slice(0,2).map(x=><Nav key={x.id} item={x} active={tab===x.id} onClick={()=>setTab(x.id)}/>)}<p className="sidebar-label">ACCOUNT SECURITY</p>{items.slice(2,4).map(x=><Nav key={x.id} item={x} active={tab===x.id} onClick={()=>setTab(x.id)}/>)}<p className="sidebar-label">PREFERENCES</p><Nav item={items[4]} active={tab==="privacy"} onClick={()=>setTab("privacy")}/><div className="sidebar-help"><CircleHelp size={18}/><span><b>Need help?</b><small>Contact our support team</small><a href="mailto:support@zenventora.in">support@zenventora.in</a></span></div></aside><section className="account-main"><div className="breadcrumb">Account <ChevronRight size={14}/> <b>{titles[tab]}</b></div><div className="account-heading"><div><p className="eyebrow">ZENVENTORA ACCOUNT</p><h1>{titles[tab]}</h1><p>{descriptions[tab]}</p></div><span className="active-status"><i/> Account active</span></div>{notice&&<div className="account-notice"><Notice notice={notice}/><button onClick={clearNotice} aria-label="Dismiss"><X size={16}/></button></div>}{children}<footer className="account-footer">© {new Date().getFullYear()} ZenVentora <i>·</i> <a href="https://zenventora.in/privacy-policy.html">Privacy</a> <i>·</i> <a href="mailto:support@zenventora.in">Support</a></footer></section></div></main>;
+}
+function Nav({item,active,onClick}:{item:{id:Tab;label:string;icon:ReactNode};active:boolean;onClick:()=>void}){return <button className={"sidebar-link "+(active?"active":"")} onClick={onClick}>{item.icon}<span>{item.label}</span>{active&&<ChevronRight size={15}/>}</button>;}
+function ProfilePanel({session,fullName,setFullName,company,setCompany,phone,setPhone,editing,setEditing,onSave,loading}:{session:Session;fullName:string;setFullName:(v:string)=>void;company:string;setCompany:(v:string)=>void;phone:string;setPhone:(v:string)=>void;editing:boolean;setEditing:(v:boolean)=>void;onSave:(e:FormEvent)=>void;loading:boolean}){
+ const user=session.user,avatar=user.user_metadata.avatar_url||user.user_metadata.picture;
+ return <div className="panel-stack"><section className="card-surface profile-hero"><div className="profile-identity"><div className="profile-avatar">{avatar?<img src={avatar} alt="Profile"/>:initials(fullName||user.email||"Z")}</div><div><span className="eyebrow">YOUR ZENVENTORA ID</span><h2>{fullName||"Welcome to ZenVentora"}</h2><p>{user.email}</p></div></div><div className="profile-meta"><span><BadgeCheck size={16}/>{user.email_confirmed_at?"Verified account":"Verification pending"}</span><span>Member since {date(user.created_at)}</span></div></section><section className="card-surface"><div className="section-title"><div><h2>Personal information</h2><p>Keep your profile details up to date.</p></div><button className="outline-button" onClick={()=>setEditing(!editing)}>{editing?<X size={16}/>:<Pencil size={15}/>} {editing?"Cancel":"Edit profile"}</button></div>{editing?<form className="profile-form" onSubmit={onSave}><div className="form-grid"><Field label="Full name" icon={<UserRound size={17}/>}><input value={fullName} onChange={e=>setFullName(e.target.value)} required/></Field><Field label="Company / organisation" icon={<Building2 size={17}/>}><input value={company} onChange={e=>setCompany(e.target.value)} placeholder="Optional"/></Field><Field label="Contact phone" icon={<Phone size={17}/>}><input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+91"/></Field></div><button className="primary compact" disabled={loading}>{loading?<Spinner/>:<><Save size={16}/> Save changes</>}</button></form>:<div className="detail-grid"><Detail label="Full name" value={fullName||"Not added"} icon={<UserRound size={17}/>}/><Detail label="Company / organisation" value={company||"Not added"} icon={<Building2 size={17}/>}/><Detail label="Contact phone" value={phone||"Not added"} icon={<Phone size={17}/>}/><Detail label="Sign-in method" value={(user.app_metadata.providers||[]).includes("google")?"Google":"Email and password"} icon={<ShieldCheck size={17}/>}/></div>}</section><section className="card-surface"><div className="section-title"><div><h2>Account overview</h2><p>Your account identity at a glance.</p></div></div><div className="overview-row"><span>Account ID</span><code>{user.id}</code></div><div className="overview-row"><span>Last sign in</span><b>{user.last_sign_in_at?dateTime(user.last_sign_in_at):"Not available"}</b></div><div className="overview-row"><span>Account created</span><b>{date(user.created_at)}</b></div></section></div>;
+}
+function EmailPanel({session,value,setValue,onSubmit,loading}:{session:Session;value:string;setValue:(v:string)=>void;onSubmit:(e:FormEvent)=>void;loading:boolean}){return <div className="panel-stack"><section className="card-surface"><div className="section-title"><div><h2>My email address</h2><p>Your email is used to sign in and recover your account.</p></div></div><div className="email-current"><span className="email-icon"><Mail size={20}/></span><div><b>{session.user.email}</b><small>Primary email address</small></div><span className="verified-pill">{session.user.email_confirmed_at?"Verified":"Pending"}</span></div></section><section className="card-surface"><div className="section-title"><div><h2>Change email address</h2><p>We'll send confirmation links before the new address becomes active.</p></div></div><form className="single-form" onSubmit={onSubmit}><Field label="New email address" icon={<Mail size={17}/>}><input type="email" value={value} onChange={e=>setValue(e.target.value)} required/></Field><button className="primary compact" disabled={loading}>{loading?<Spinner/>:<>Send confirmation <ArrowRight size={16}/></>}</button></form></section></div>;}
+function SecurityPanel({password,setPassword,confirm,setConfirm,onSubmit,loading}:{password:string;setPassword:(v:string)=>void;confirm:string;setConfirm:(v:string)=>void;onSubmit:(e:FormEvent)=>void;loading:boolean}){return <div className="panel-stack"><section className="security-banner"><ShieldCheck size={25}/><div><b>Your account is protected</b><p>Use a unique password and keep your recovery email up to date.</p></div></section><section className="card-surface"><div className="section-title"><div><h2>Change password</h2><p>Choose a strong password you don't use elsewhere.</p></div></div><form className="single-form" onSubmit={onSubmit}><Field label="New password" icon={<LockKeyhole size={17}/>}><input type="password" minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required/></Field><Field label="Confirm new password" icon={<LockKeyhole size={17}/>}><input type="password" minLength={8} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required/></Field><p className="helper">Use 8 or more characters. A mix of letters, numbers and symbols is recommended.</p><button className="primary compact" disabled={loading}>{loading?<Spinner/>:<>Update password <ArrowRight size={16}/></>}</button></form></section><section className="card-surface security-note"><KeyRound size={19}/><div><b>Two-factor authentication</b><p>Additional sign-in verification can be enabled as a future security enhancement.</p></div><span className="coming-pill">Not enabled</span></section></div>;}
+function SessionsPanel({session,onLogout,loading}:{session:Session;onLogout:()=>void;loading:boolean}){return <div className="panel-stack"><section className="card-surface"><div className="section-title"><div><h2>Active session</h2><p>This browser is currently signed in to your account.</p></div><span className="verified-pill">Current</span></div><div className="session-item"><Monitor size={21}/><div><b>Current browser session</b><p>Signed in {session.user.last_sign_in_at?dateTime(session.user.last_sign_in_at):"recently"}</p><small>Session managed securely by Supabase Auth</small></div><span className="active-status"><i/> Active now</span></div></section><section className="card-surface danger-zone"><div><h2>Sign out everywhere</h2><p>End all active sessions for this account, including this browser. You'll need to sign in again.</p></div><button className="danger-button" onClick={onLogout} disabled={loading}>{loading?<Spinner/>:<><LogOut size={16}/> Sign out all sessions</>}</button></section></div>;}
+function PrivacyPanel(){return <div className="panel-stack"><section className="card-surface"><div className="section-title"><div><h2>Your account data</h2><p>Information associated with your ZenVentora identity.</p></div><ShieldCheck className="teal-icon" size={23}/></div><div className="privacy-list"><div><UserRound size={18}/><span><b>Profile information</b><small>Name, company and contact details you choose to provide.</small></span></div><div><Mail size={18}/><span><b>Authentication information</b><small>Email address and sign-in provider used to secure your account.</small></span></div><div><Globe2 size={18}/><span><b>Connected products</b><small>Your identity may be used by ZenVentora products as they are integrated with this account service.</small></span></div></div><a className="privacy-link" href="https://zenventora.in/privacy-policy.html" target="_blank" rel="noreferrer">Read ZenVentora privacy policy <ArrowRight size={15}/></a></section></div>;}
+function Detail({label,value,icon}:{label:string;value:string;icon:ReactNode}){return <div className="detail-item"><span className="detail-icon">{icon}</span><div><small>{label}</small><b>{value}</b></div></div>;}
+function initials(s:string){return s.trim().split(/\s+/).slice(0,2).map(x=>x[0]?.toUpperCase()).join("")||"Z";}
+function date(s:string){return new Date(s).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});}
+function dateTime(s:string){return new Date(s).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"});}
