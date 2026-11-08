@@ -24,7 +24,7 @@ function safeReturnOrigin(value:string|null, allowEmenu:boolean) {
 }
 const returnTo = safeReturnOrigin(accountParams.get("returnTo"), productContext === "emenu");
 const postLogoutTo = safeReturnOrigin(accountParams.get("postLogoutTo"), productContext === "emenu");
-const accountWebsite = returnTo || (productContext === "emenu" ? EMENU_SITE : MAIN_SITE);
+const accountWebsite = returnTo || postLogoutTo || (productContext === "emenu" ? EMENU_SITE : MAIN_SITE);
 
 export default function App() {
   const [view,setView]=useState<View>(()=>new URLSearchParams(window.location.search).get("view")==="signup"?"signup":"signin"),[tab,setTab]=useState<Tab>("profile");
