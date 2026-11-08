@@ -10,7 +10,21 @@ type Notice = { type: "success" | "error"; text: string } | null;
 const LOGO = "https://zenventora.in/assets/zenventora-logo.svg";
 const MAIN_SITE = "https://zenventora.in";
 const AUTH_REDIRECT_URL = "https://accounts.zenventora.in";
-const returnTo = (() => { const candidate = new URLSearchParams(window.location.search).get("returnTo"); return candidate === MAIN_SITE || candidate === `${MAIN_SITE}/` ? MAIN_SITE : null; })();
+const EMENU_SITE = "https://emenu-x75b.onrender.com";
+const accountParams = new URLSearchParams(window.location.search);
+const productContext = accountParams.get("product") === "emenu" ? "emenu" : null;
+function safeReturnOrigin(value:string|null, allowEmenu:boolean) {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
+    const allowed = [MAIN_SITE, ...(allowEmenu ? [EMENU_SITE, "https://emenu.zenventora.in"] : [])];
+    return allowed.includes(parsed.origin) ? parsed.origin : null;
+  } catch { return null; }
+}
+const returnTo = safeReturnOrigin(accountParams.get("returnTo"), productContext === "emenu");
+const postLogoutTo = safeReturnOrigin(accountParams.get("postLogoutTo"), productContext === "emenu");
+const accountWebsite = returnTo || (productContext === "emenu" ? EMENU_SITE : MAIN_SITE);
 
 export default function App() {
   const [view,setView]=useState<View>(()=>new URLSearchParams(window.location.search).get("view")==="signup"?"signup":"signin"),[tab,setTab]=useState<Tab>("profile");
@@ -18,7 +32,7 @@ export default function App() {
   const [email,setEmail]=useState(""),[fullName,setFullName]=useState(""),[password,setPassword]=useState(""),[otp,setOtp]=useState(""),[showPassword,setShowPassword]=useState(false);
   const [company,setCompany]=useState(""),[phone,setPhone]=useState(""),[editing,setEditing]=useState(false),[newEmail,setNewEmail]=useState(""),[newPassword,setNewPassword]=useState(""),[confirmPassword,setConfirmPassword]=useState(""),[mobileNav,setMobileNav]=useState(false);
 
-  useEffect(()=>{let alive=true;const finishSignIn=(next:Session|null)=>{if(!next||!returnTo)return;const target=new URL(returnTo);target.hash=new URLSearchParams({access_token:next.access_token,refresh_token:next.refresh_token,type:"account_handoff"}).toString();window.location.replace(target.toString());};supabase.auth.getSession().then(({data})=>{if(!alive)return;setSession(data.session);if(data.session){setView("dashboard");finishSignIn(data.session);}});const {data:listener}=supabase.auth.onAuthStateChange((event,next)=>{setSession(next);if(event==="PASSWORD_RECOVERY")setView("reset");else if(next&&event!=="TOKEN_REFRESHED"){setView("dashboard");finishSignIn(next);}});return()=>{alive=false;listener.subscription.unsubscribe();};},[]);
+  useEffect(()=>{let alive=true;const finishSignIn=(next:Session|null)=>{if(!next||!returnTo)return;const handoff=new URLSearchParams({access_token:next.access_token,refresh_token:next.refresh_token,type:"account_handoff"});if(returnTo===EMENU_SITE||returnTo==="https://emenu.zenventora.in")handoff.set("product","emenu");const target=new URL(returnTo);target.hash=handoff.toString();window.location.replace(target.toString());};supabase.auth.getSession().then(({data})=>{if(!alive)return;setSession(data.session);if(data.session){setView("dashboard");finishSignIn(data.session);}});const {data:listener}=supabase.auth.onAuthStateChange((event,next)=>{setSession(next);if(event==="PASSWORD_RECOVERY")setView("reset");else if(next&&event!=="TOKEN_REFRESHED"){setView("dashboard");finishSignIn(next);}});return()=>{alive=false;listener.subscription.unsubscribe();};},[]);
   useEffect(()=>{if(!session?.user)return;const m=session.user.user_metadata||{};setFullName(m.full_name||m.name||"");setCompany(m.company_name||"");setPhone(m.phone_number||"");setNewEmail(session.user.email||"");},[session?.user.id,session?.user.user_metadata]);
   const run=async(action:()=>Promise<void>)=>{setLoading(true);setNotice(null);try{await action();}catch(e){setNotice({type:"error",text:e instanceof Error?e.message:"Something went wrong. Please try again."});}finally{setLoading(false);}};
   const refresh=async()=>{const {data}=await supabase.auth.getSession();setSession(data.session);};
@@ -32,7 +46,7 @@ export default function App() {
   const saveProfile=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.updateUser({data:{full_name:fullName.trim(),company_name:company.trim(),phone_number:phone.trim()}});if(error)throw error;await refresh();setEditing(false);setNotice({type:"success",text:"Profile information updated."});});};
   const updateEmail=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.updateUser({email:newEmail.trim()});if(error)throw error;setNotice({type:"success",text:"A confirmation link has been sent. Your email changes after you confirm it."});});};
   const updatePassword=(e:FormEvent)=>{e.preventDefault();void run(async()=>{if(newPassword.length<8)throw new Error("Use at least 8 characters.");if(newPassword!==confirmPassword)throw new Error("The passwords do not match.");const {error}=await supabase.auth.updateUser({password:newPassword});if(error)throw error;setNewPassword("");setConfirmPassword("");setNotice({type:"success",text:"Password changed successfully."});});};
-  const logout=()=>void run(async()=>{const {error}=await supabase.auth.signOut({scope:"global"});if(error)throw error;setSession(null);setPassword("");window.location.replace(`${MAIN_SITE}/?account_signed_out=1`);});
+  const logout=()=>void run(async()=>{const {error}=await supabase.auth.signOut({scope:"global"});if(error)throw error;setSession(null);setPassword("");const destination=postLogoutTo||returnTo||accountWebsite;window.location.replace(`${destination}/?account_signed_out=1`);});
   const switchView=(v:View)=>{setNotice(null);setPassword("");setView(v);};
   const switchTab=(v:Tab)=>{setNotice(null);setTab(v);setEditing(false);setMobileNav(false);};
 
@@ -60,7 +74,7 @@ export default function App() {
   </section></AuthShell>;
 }
 
-function websiteHandoffUrl(session:Session){const params=new URLSearchParams({access_token:session.access_token,refresh_token:session.refresh_token,type:"account_handoff"});return `${MAIN_SITE}/#${params.toString()}`;}
+function websiteHandoffUrl(session:Session){const params=new URLSearchParams({access_token:session.access_token,refresh_token:session.refresh_token,type:"account_handoff"});if(accountWebsite===EMENU_SITE||accountWebsite==="https://emenu.zenventora.in")params.set("product","emenu");return `${accountWebsite}/#${params.toString()}`;}
 function Brand({light=false}:{light?:boolean}){return <a className={"brand "+(light?"brand-light":"")} href="https://zenventora.in/"><img src={LOGO} alt="ZenVentora"/><span>ZENVENTORA</span></a>;}
 function AuthShell({children}:{children:ReactNode}){return <main className="auth-page"><div className="auth-glow"/><div className="auth-page-content">{children}</div></main>;}
 function Field({label,icon,children}:{label:string;icon:ReactNode;children:ReactNode}){return <label className="field"><span className="field-label">{label}</span><span className="input-shell"><span className="input-icon">{icon}</span>{children}</span></label>;}
