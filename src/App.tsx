@@ -33,11 +33,11 @@ function authRedirectUrl(flow = activeProductFlow) {
   if (productContext === "emenu" && flow === "signup") url.searchParams.set("productFlow", "signup");
   return url.toString();
 }
-const isPasswordRecoveryCallback = new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery";
+const isPasswordRecoveryCallback = accountParams.get("recovery") === "1" || new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery";
 
 
 export default function App() {
-  const [view,setView]=useState<View>(()=>{const requested=new URLSearchParams(window.location.search).get("view");return requested==="signup"?"signup":requested==="forgot"?"forgot":"signin";}),[tab,setTab]=useState<Tab>("profile");
+  const [view,setView]=useState<View>(()=>{const requested=new URLSearchParams(window.location.search).get("view");if(requested==="signup")return "signup";if(requested==="forgot")return "forgot";if(new URLSearchParams(window.location.search).get("recovery")==="1")return "reset";return "signin";}),[tab,setTab]=useState<Tab>("profile");
   const [session,setSession]=useState<Session|null>(null),[loading,setLoading]=useState(false),[notice,setNotice]=useState<Notice>(null);
   const [email,setEmail]=useState(""),[fullName,setFullName]=useState(""),[password,setPassword]=useState(""),[otp,setOtp]=useState(""),[showPassword,setShowPassword]=useState(false);
   const [company,setCompany]=useState(""),[phone,setPhone]=useState(""),[editing,setEditing]=useState(false),[newEmail,setNewEmail]=useState(""),[newPassword,setNewPassword]=useState(""),[confirmPassword,setConfirmPassword]=useState(""),[mobileNav,setMobileNav]=useState(false);
