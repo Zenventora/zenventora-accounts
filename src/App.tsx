@@ -46,7 +46,47 @@ export default function App() {
   useEffect(()=>{if(!session?.user)return;const m=session.user.user_metadata||{};setFullName(m.full_name||m.name||"");setCompany(m.company_name||"");setPhone(m.phone_number||"");setNewEmail(session.user.email||"");},[session?.user.id,session?.user.user_metadata]);
   const run=async(action:()=>Promise<void>)=>{setLoading(true);setNotice(null);try{await action();}catch(e){setNotice({type:"error",text:e instanceof Error?e.message:"Something went wrong. Please try again."});}finally{setLoading(false);}};
   const refresh=async()=>{const {data}=await supabase.auth.getSession();setSession(data.session);};
-  const signIn=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(error)throw error;});};
+  const signIn=(e:FormEvent)=>{e.preventDefault();void run(async()=>{
+    const normalizedEmail=email.trim().toLowerCase();
+    const {error}=await supabase.auth.signInWithPassword({email:normalizedEmail,password});
+    if(!error)return;
+    // Only EMenu-origin sign-ins may attempt the one-time legacy credential bridge.
+    // The EMenu API checks the old bcrypt hash; Supabase then creates the canonical
+    // identity with the same password, preserving the user's existing credential.
+    if(productContext!=="emenu")throw error;
+    const legacyResponse=await fetch("https://emenu.zenventora.in/api/auth/legacy/verify",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:normalizedEmail,password}),
+      cache:"no-store"
+    });
+    const legacyPayload=await legacyResponse.json().catch(()=>({}));
+    if(!legacyResponse.ok||legacyPayload.verified!==true){
+      throw new Error(legacyPayload.message||"Invalid email or password.");
+    }
+    const {data:created,error:createError}=await supabase.auth.signUp({
+      email:normalizedEmail,
+      password,
+      options:{
+        data:{
+          full_name:legacyPayload.profile?.name||normalizedEmail.split("@")[0],
+          phone_number:legacyPayload.profile?.phone||""
+        },
+        emailRedirectTo:authRedirectUrl("signin")
+      }
+    });
+    if(createError)throw new Error("Your old EMenu password was verified, but the ZenVentora account could not be created. Please use Forgot password or contact support.");
+    if(created.user&&Array.isArray(created.user.identities)&&created.user.identities.length===0){
+      setNotice({type:"error",text:"Your old EMenu password is valid, but a ZenVentora account already exists with this email. Use Forgot password to set or recover its Common Accounts password, then sign in here."});
+      setView("forgot");
+      return;
+    }
+    if(created.session){setSession(created.session);setView("dashboard");}
+    else{
+      setView("verify");
+      setNotice({type:"success",text:"Your existing EMenu account is verified and your ZenVentora identity is being created. Check your email to confirm it; your EMenu business, menus and products remain unchanged."});
+    }
+  });};
   const signUp=(e:FormEvent)=>{e.preventDefault();if(productContext==="emenu")activeProductFlow="signup";void run(async()=>{const {data,error}=await supabase.auth.signUp({email:email.trim(),password,options:{data:{full_name:fullName.trim()},emailRedirectTo:authRedirectUrl('signup')}});if(error)throw error;if(data.user && Array.isArray(data.user.identities) && data.user.identities.length===0){setView("signin");setNotice({type:"error",text:"An account already exists with this email. Continue with Google or sign in instead."});return;}if(data.session)setView("dashboard");else{setView("verify");setNotice({type:"success",text:"If this is a new email address, a verification code has been sent. Check your inbox and spam folder."});}});};
   const verify=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:"signup"});if(error)throw error;await refresh();setView("dashboard");setNotice({type:"success",text:"Email verified successfully."});});};
   const resend=()=>void run(async()=>{const {error}=await supabase.auth.resend({type:"signup",email:email.trim(),options:{emailRedirectTo:authRedirectUrl('signup')}});if(error)throw error;setNotice({type:"success",text:"A new confirmation email has been sent."});});
