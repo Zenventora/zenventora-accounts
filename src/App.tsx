@@ -9,7 +9,12 @@ type Tab = "profile" | "email" | "security" | "sessions" | "privacy";
 type Notice = { type: "success" | "error"; text: string } | null;
 const LOGO = "https://zenventora.in/assets/zenventora-logo.svg";
 const MAIN_SITE = "https://zenventora.in";
-const AUTH_REDIRECT_URL = "https://accounts.zenventora.in";
+const AUTH_REDIRECT_URL = (() => {
+  const url = new URL("https://accounts.zenventora.in");
+  if (returnTo) url.searchParams.set("returnTo", returnTo);
+  if (productContext) url.searchParams.set("product", productContext);
+  return url.toString();
+})();
 const EMENU_SITE = "https://emenu-x75b.onrender.com";
 const accountParams = new URLSearchParams(window.location.search);
 const productContext = accountParams.get("product") === "emenu" ? "emenu" : null;
@@ -41,7 +46,7 @@ export default function App() {
   const verify=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:"signup"});if(error)throw error;await refresh();setView("dashboard");setNotice({type:"success",text:"Email verified successfully."});});};
   const resend=()=>void run(async()=>{const {error}=await supabase.auth.resend({type:"signup",email:email.trim(),options:{emailRedirectTo:AUTH_REDIRECT_URL}});if(error)throw error;setNotice({type:"success",text:"A new confirmation email has been sent."});});
   const forgot=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.resetPasswordForEmail(email.trim(),{redirectTo:AUTH_REDIRECT_URL});if(error)throw error;setNotice({type:"success",text:"If an account exists for this email, a reset link has been sent."});});};
-  const reset=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.updateUser({password});if(error)throw error;await refresh();setView("dashboard");setNotice({type:"success",text:"Password updated successfully."});});};
+  const reset=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.updateUser({password});if(error)throw error;await refresh();const {data}=await supabase.auth.getSession();setView("dashboard");setNotice({type:"success",text:"Password updated successfully."});if(data.session&&returnTo){const target=new URL(returnTo);const handoff=new URLSearchParams({access_token:data.session.access_token,refresh_token:data.session.refresh_token,type:"account_handoff"});if(returnTo===EMENU_SITE||returnTo==="https://emenu.zenventora.in")handoff.set("product","emenu");target.hash=handoff.toString();window.location.replace(target.toString());}});};
   const google=()=>void run(async()=>{const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:AUTH_REDIRECT_URL}});if(error)throw error;});
   const saveProfile=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.updateUser({data:{full_name:fullName.trim(),company_name:company.trim(),phone_number:phone.trim()}});if(error)throw error;await refresh();setEditing(false);setNotice({type:"success",text:"Profile information updated."});});};
   const updateEmail=(e:FormEvent)=>{e.preventDefault();void run(async()=>{const {error}=await supabase.auth.updateUser({email:newEmail.trim()});if(error)throw error;setNotice({type:"success",text:"A confirmation link has been sent. Your email changes after you confirm it."});});};
