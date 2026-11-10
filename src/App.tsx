@@ -18,7 +18,7 @@ const accountParams = new URLSearchParams(window.location.search);
 const requestedProduct = (accountParams.get("product") || "").trim().toLowerCase();
 const productContext = Object.prototype.hasOwnProperty.call(PRODUCT_ORIGINS, requestedProduct) ? requestedProduct : null;
 let activeProductFlow = accountParams.get("productFlow") === "signup" ? "signup" : "signin";
-function safeReturnOrigin(value:string|null, product:string|null) {
+function safeReturnOrigin(value:string|null) {
   if (!value) return null;
   try {
     const parsed = new URL(value);
@@ -27,8 +27,8 @@ function safeReturnOrigin(value:string|null, product:string|null) {
     return allowed.includes(parsed.origin) ? parsed.origin : null;
   } catch { return null; }
 }
-const returnTo = safeReturnOrigin(accountParams.get("returnTo"), productContext);
-const postLogoutTo = safeReturnOrigin(accountParams.get("postLogoutTo"), productContext);
+const returnTo = safeReturnOrigin(accountParams.get("returnTo"));
+const postLogoutTo = safeReturnOrigin(accountParams.get("postLogoutTo"));
 const forceSignout = accountParams.get("signout") === "1";
 const accountWebsite = returnTo || postLogoutTo || (productContext ? PRODUCT_ORIGINS[productContext] : MAIN_SITE);
 function authRedirectUrl(flow = activeProductFlow) {
