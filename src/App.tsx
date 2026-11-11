@@ -32,7 +32,7 @@ function safeReturnOrigin(value:string|null) {
 const returnTo = safeReturnOrigin(accountParams.get("returnTo"));
 const postLogoutTo = safeReturnOrigin(accountParams.get("postLogoutTo"));
 const forceSignout = accountParams.get("signout") === "1";
-const accountWebsite = returnTo || postLogoutTo || (productContext ? PRODUCT_ORIGINS[productContext] : MAIN_SITE);
+const accountWebsite = returnTo || postLogoutTo || (productContext ? (PRODUCT_ORIGINS[productContext] || MAIN_SITE) : MAIN_SITE);
 function authRedirectUrl(flow = activeProductFlow) {
   const url = new URL(flow === "signup" ? "https://accounts.zenventora.in/signup" : "https://accounts.zenventora.in/login");
   if (returnTo) url.searchParams.set("returnTo", returnTo);
