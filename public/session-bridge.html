@@ -10,12 +10,15 @@
   import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
   const ACCOUNT_ORIGIN = "https://accounts.zenventora.in";
+  const ALLOWED_PARENTS = new Set([
+    "https://zenventora.in",
+    "https://www.zenventora.in",
+    "https://emenu.zenventora.in"
+  ]);
   const parentOrigin = (() => {
     try {
-      const url = new URL(document.referrer);
-      const allowed = url.protocol === "https:" &&
-        (url.hostname === "zenventora.in" || url.hostname.endsWith(".zenventora.in"));
-      return allowed ? url.origin : null;
+      const origin = new URL(document.referrer).origin;
+      return ALLOWED_PARENTS.has(origin) ? origin : null;
     } catch {
       return null;
     }
@@ -43,21 +46,8 @@
     }
   }) : null;
 
-  const sendSession = (session) => {
-    send("session", {
-      user: safeUser(session?.user || null),
-      access_token: session?.access_token || null,
-     });
-  };
-
   window.addEventListener("message", async (event) => {
     if (!parentOrigin || event.origin !== parentOrigin || event.source !== window.parent) return;
-    if (event.data?.type === "zenventora:request_session") {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) send("session", { user: null, access_token: null });
-      else sendSession(data.session);
-      return;
-    }
     if (event.data?.type !== "zenventora:signout") return;
     const { error } = await supabase.auth.signOut({ scope: "global" });
     if (error) send("signout_error", { message: error.message });
@@ -65,12 +55,12 @@
   });
 
   supabase.auth.onAuthStateChange((_event, session) => {
-    sendSession(session);
+    send("session", { user: safeUser(session?.user || null) });
   });
 
   const { data, error } = await supabase.auth.getSession();
-  if (error) send("session", { user: null, access_token: null, refresh_token: null });
-  else sendSession(data.session);
+  if (error) send("session", { user: null });
+  else send("session", { user: safeUser(data.session?.user || null) });
 </script>
 </body>
 </html>

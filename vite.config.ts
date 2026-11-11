@@ -9,8 +9,7 @@ export default defineConfig({
         main: "index.html",
         login: "login/index.html",
         signup: "signup/index.html",
-        forgot: "forgot/index.html",
-        accountSettings: "account/settings/index.html"
+        forgot: "forgot/index.html"
       }
     }
   }

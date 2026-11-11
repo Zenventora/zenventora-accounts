@@ -9,7 +9,6 @@ type Tab = "profile" | "email" | "security" | "sessions" | "privacy";
 type Notice = { type: "success" | "error"; text: string } | null;
 const LOGO = "https://zenventora.in/assets/zenventora-logo.svg";
 const MAIN_SITE = "https://zenventora.in";
-const ACCOUNT_ORIGIN = "https://zenventora-accounts-bels.onrender.com";
 const PRODUCT_ORIGINS: Record<string,string> = {
   emenu: "https://emenu.zenventora.in",
   siteradar: "https://siteradar.zenventora.in",
@@ -17,25 +16,23 @@ const PRODUCT_ORIGINS: Record<string,string> = {
 };
 const accountParams = new URLSearchParams(window.location.search);
 const requestedProduct = (accountParams.get("product") || "").trim().toLowerCase();
-const productContext = /^[a-z0-9][a-z0-9-]{0,63}$/.test(requestedProduct) ? requestedProduct : null;
+const productContext = Object.prototype.hasOwnProperty.call(PRODUCT_ORIGINS, requestedProduct) ? requestedProduct : null;
 let activeProductFlow = accountParams.get("productFlow") === "signup" ? "signup" : "signin";
 function safeReturnOrigin(value:string|null) {
   if (!value) return null;
   try {
     const parsed = new URL(value);
     if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
-    const host = parsed.hostname;
-    const allowed = parsed.protocol === "https:" &&
-      (host === "zenventora.in" || host.endsWith(".zenventora.in"));
-    return allowed ? parsed.origin : null;
+    const allowed = [MAIN_SITE, ...Object.values(PRODUCT_ORIGINS)];
+    return allowed.includes(parsed.origin) ? parsed.origin : null;
   } catch { return null; }
 }
 const returnTo = safeReturnOrigin(accountParams.get("returnTo"));
 const postLogoutTo = safeReturnOrigin(accountParams.get("postLogoutTo"));
 const forceSignout = accountParams.get("signout") === "1";
-const accountWebsite = returnTo || postLogoutTo || (productContext ? (PRODUCT_ORIGINS[productContext] || MAIN_SITE) : MAIN_SITE);
+const accountWebsite = returnTo || postLogoutTo || (productContext ? PRODUCT_ORIGINS[productContext] : MAIN_SITE);
 function authRedirectUrl(flow = activeProductFlow) {
-  const url = new URL(flow === "signup" ? `${ACCOUNT_ORIGIN}/signup` : `${ACCOUNT_ORIGIN}/login`);
+  const url = new URL(flow === "signup" ? "https://accounts.zenventora.in/signup" : "https://accounts.zenventora.in/login");
   if (returnTo) url.searchParams.set("returnTo", returnTo);
   if (productContext) {
     url.searchParams.set("product", productContext);
@@ -47,7 +44,7 @@ const isPasswordRecoveryCallback = accountParams.get("recovery") === "1" || new 
 
 
 export default function App() {
-  const [view,setView]=useState<View>(()=>{const requested=new URLSearchParams(window.location.search).get("view");const path=window.location.pathname.replace(/\/+$/,"");if(path==="/signup"||requested==="signup")return "signup";if(path==="/forgot"||requested==="forgot")return "forgot";if(path==="/account/settings"||requested==="account")return "dashboard";if(new URLSearchParams(window.location.search).get("recovery")==="1")return "reset";return "signin";}),[tab,setTab]=useState<Tab>("profile");
+  const [view,setView]=useState<View>(()=>{const requested=new URLSearchParams(window.location.search).get("view");const path=window.location.pathname.replace(/\/+$/,"");if(path==="/signup"||requested==="signup")return "signup";if(path==="/forgot"||requested==="forgot")return "forgot";if(new URLSearchParams(window.location.search).get("recovery")==="1")return "reset";return "signin";}),[tab,setTab]=useState<Tab>("profile");
   const [session,setSession]=useState<Session|null>(null),[loading,setLoading]=useState(false),[notice,setNotice]=useState<Notice>(null);
   const [email,setEmail]=useState(""),[fullName,setFullName]=useState(""),[password,setPassword]=useState(""),[otp,setOtp]=useState(""),[showPassword,setShowPassword]=useState(false);
   const [company,setCompany]=useState(""),[phone,setPhone]=useState(""),[editing,setEditing]=useState(false),[newEmail,setNewEmail]=useState(""),[newPassword,setNewPassword]=useState(""),[confirmPassword,setConfirmPassword]=useState(""),[mobileNav,setMobileNav]=useState(false);
