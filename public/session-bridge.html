@@ -43,14 +43,6 @@
     }
   }) : null;
 
-  window.addEventListener("message", async (event) => {
-    if (!parentOrigin || event.origin !== parentOrigin || event.source !== window.parent) return;
-    if (event.data?.type !== "zenventora:signout") return;
-    const { error } = await supabase.auth.signOut({ scope: "global" });
-    if (error) send("signout_error", { message: error.message });
-    else send("signed_out");
-  });
-
   const sendSession = (session) => {
     send("session", {
       user: safeUser(session?.user || null),
