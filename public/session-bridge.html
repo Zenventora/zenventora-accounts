@@ -1,66 +1,54 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ZenVentora Account Session Bridge</title>
-</head>
+<head><meta charset="utf-8"><title>ZenVentora Account Session Bridge</title></head>
 <body>
 <script type="module">
   import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-  const ACCOUNT_ORIGIN = "https://accounts.zenventora.in";
+  const SUPABASE_URL = "https://flwzqlywdlwatycxexmk.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QN1aNd7wxjkb6ktD6L8GOQ_nsfV1_bY";
   const ALLOWED_PARENTS = new Set([
     "https://zenventora.in",
-    "https://www.zenventora.in",
-    "https://emenu.zenventora.in"
+    "https://www.zenventora.in"
   ]);
-  const parentOrigin = (() => {
-    try {
-      const origin = new URL(document.referrer).origin;
-      return ALLOWED_PARENTS.has(origin) ? origin : null;
-    } catch {
-      return null;
-    }
-  })();
 
-  const supabase = createClient(
-    "https://flwzqlywdlwatycxexmk.supabase.co",
-    "sb_publishable_QN1aNd7wxjkb6ktD6L8GOQ_nsfV1_bY",
-    { auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } }
-  );
-
-  const send = (type, payload = {}) => {
-    if (!parentOrigin || window.parent === window) return;
-    window.parent.postMessage({ namespace: "zenventora-account-bridge", type, ...payload }, parentOrigin);
-  };
-  const safeUser = (user) => user ? ({
-    id: user.id,
-    email: user.email || "",
-    user_metadata: {
-      full_name: user.user_metadata?.full_name || "",
-      name: user.user_metadata?.name || "",
-      company_name: user.user_metadata?.company_name || "",
-      avatar_url: user.user_metadata?.avatar_url || "",
-      picture: user.user_metadata?.picture || ""
-    }
-  }) : null;
-
-  window.addEventListener("message", async (event) => {
-    if (!parentOrigin || event.origin !== parentOrigin || event.source !== window.parent) return;
-    if (event.data?.type !== "zenventora:signout") return;
-    const { error } = await supabase.auth.signOut({ scope: "global" });
-    if (error) send("signout_error", { message: error.message });
-    else send("signed_out");
+  const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: false }
   });
 
-  supabase.auth.onAuthStateChange((_event, session) => {
-    send("session", { user: safeUser(session?.user || null) });
+  function parentOrigin() {
+    return ALLOWED_PARENTS.has(document.referrer ? new URL(document.referrer).origin : "")
+      ? new URL(document.referrer).origin
+      : null;
+  }
+
+  async function sendSession(targetOrigin) {
+    if (!targetOrigin || !ALLOWED_PARENTS.has(targetOrigin)) return;
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    window.parent.postMessage({
+      type: "zenventora:account-session",
+      session: session ? {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token
+      } : null
+    }, targetOrigin);
+  }
+
+  const initialOrigin = parentOrigin();
+  if (initialOrigin) sendSession(initialOrigin);
+
+  window.addEventListener("message", event => {
+    if (!ALLOWED_PARENTS.has(event.origin) || event.source !== window.parent) return;
+    if (event.data?.type === "zenventora:request-session") {
+      sendSession(event.origin);
+    }
   });
 
-  const { data, error } = await supabase.auth.getSession();
-  if (error) send("session", { user: null });
-  else send("session", { user: safeUser(data.session?.user || null) });
+  supabase.auth.onAuthStateChange(() => {
+    const origin = parentOrigin();
+    if (origin) sendSession(origin);
+  });
 </script>
 </body>
 </html>
