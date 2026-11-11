@@ -16,15 +16,17 @@ const PRODUCT_ORIGINS: Record<string,string> = {
 };
 const accountParams = new URLSearchParams(window.location.search);
 const requestedProduct = (accountParams.get("product") || "").trim().toLowerCase();
-const productContext = Object.prototype.hasOwnProperty.call(PRODUCT_ORIGINS, requestedProduct) ? requestedProduct : null;
+const productContext = /^[a-z0-9][a-z0-9-]{0,63}$/.test(requestedProduct) ? requestedProduct : null;
 let activeProductFlow = accountParams.get("productFlow") === "signup" ? "signup" : "signin";
 function safeReturnOrigin(value:string|null) {
   if (!value) return null;
   try {
     const parsed = new URL(value);
     if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
-    const allowed = [MAIN_SITE, ...Object.values(PRODUCT_ORIGINS)];
-    return allowed.includes(parsed.origin) ? parsed.origin : null;
+    const host = parsed.hostname;
+    const allowed = parsed.protocol === "https:" &&
+      (host === "zenventora.in" || host.endsWith(".zenventora.in"));
+    return allowed ? parsed.origin : null;
   } catch { return null; }
 }
 const returnTo = safeReturnOrigin(accountParams.get("returnTo"));
