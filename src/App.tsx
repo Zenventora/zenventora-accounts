@@ -9,6 +9,7 @@ type Tab = "profile" | "email" | "security" | "sessions" | "privacy";
 type Notice = { type: "success" | "error"; text: string } | null;
 const LOGO = "https://zenventora.in/assets/zenventora-logo.svg";
 const MAIN_SITE = "https://zenventora.in";
+const ACCOUNT_ORIGIN = "https://zenventora-accounts-bels.onrender.com";
 const PRODUCT_ORIGINS: Record<string,string> = {
   emenu: "https://emenu.zenventora.in",
   siteradar: "https://siteradar.zenventora.in",
@@ -34,7 +35,7 @@ const postLogoutTo = safeReturnOrigin(accountParams.get("postLogoutTo"));
 const forceSignout = accountParams.get("signout") === "1";
 const accountWebsite = returnTo || postLogoutTo || (productContext ? (PRODUCT_ORIGINS[productContext] || MAIN_SITE) : MAIN_SITE);
 function authRedirectUrl(flow = activeProductFlow) {
-  const url = new URL(flow === "signup" ? "https://accounts.zenventora.in/signup" : "https://accounts.zenventora.in/login");
+  const url = new URL(flow === "signup" ? `${ACCOUNT_ORIGIN}/signup` : `${ACCOUNT_ORIGIN}/login`);
   if (returnTo) url.searchParams.set("returnTo", returnTo);
   if (productContext) {
     url.searchParams.set("product", productContext);
@@ -46,7 +47,7 @@ const isPasswordRecoveryCallback = accountParams.get("recovery") === "1" || new 
 
 
 export default function App() {
-  const [view,setView]=useState<View>(()=>{const requested=new URLSearchParams(window.location.search).get("view");const path=window.location.pathname.replace(/\/+$/,"");if(path==="/signup"||requested==="signup")return "signup";if(path==="/forgot"||requested==="forgot")return "forgot";if(new URLSearchParams(window.location.search).get("recovery")==="1")return "reset";return "signin";}),[tab,setTab]=useState<Tab>("profile");
+  const [view,setView]=useState<View>(()=>{const requested=new URLSearchParams(window.location.search).get("view");const path=window.location.pathname.replace(/\/+$/,"");if(path==="/signup"||requested==="signup")return "signup";if(path==="/forgot"||requested==="forgot")return "forgot";if(path==="/account/settings"||requested==="account")return "dashboard";if(new URLSearchParams(window.location.search).get("recovery")==="1")return "reset";return "signin";}),[tab,setTab]=useState<Tab>("profile");
   const [session,setSession]=useState<Session|null>(null),[loading,setLoading]=useState(false),[notice,setNotice]=useState<Notice>(null);
   const [email,setEmail]=useState(""),[fullName,setFullName]=useState(""),[password,setPassword]=useState(""),[otp,setOtp]=useState(""),[showPassword,setShowPassword]=useState(false);
   const [company,setCompany]=useState(""),[phone,setPhone]=useState(""),[editing,setEditing]=useState(false),[newEmail,setNewEmail]=useState(""),[newPassword,setNewPassword]=useState(""),[confirmPassword,setConfirmPassword]=useState(""),[mobileNav,setMobileNav]=useState(false);
