@@ -47,8 +47,7 @@
     send("session", {
       user: safeUser(session?.user || null),
       access_token: session?.access_token || null,
-      refresh_token: session?.refresh_token || null
-    });
+     });
   };
 
   window.addEventListener("message", async (event) => {
