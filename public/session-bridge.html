@@ -54,7 +54,7 @@
     if (!parentOrigin || event.origin !== parentOrigin || event.source !== window.parent) return;
     if (event.data?.type === "zenventora:request_session") {
       const { data, error } = await supabase.auth.getSession();
-      if (error) send("session", { user: null, access_token: null, refresh_token: null });
+      if (error) send("session", { user: null, access_token: null });
       else sendSession(data.session);
       return;
     }
