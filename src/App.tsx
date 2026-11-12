@@ -141,24 +141,38 @@ function websiteHandoffUrl(session:Session){
   target.hash=params.toString();
   return target.toString();
 }
-function productHandoffUrl(session:Session,product:string){
+async function activateProductSession(session:Session,product:string){
   const origin=PRODUCT_ORIGINS[product]||MAIN_SITE;
-  const target=new URL(origin);
-  target.hash=new URLSearchParams({
-    access_token:session.access_token,
-    refresh_token:session.refresh_token,
-    type:"account_handoff",
-    product
-  }).toString();
-  return target.toString();
+  const response=await fetch(origin + "/api/auth/common/session",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    credentials:"include",
+    cache:"no-store",
+    body:JSON.stringify({
+      accessToken:session.access_token,
+      refreshToken:session.refresh_token,
+      productFlow:"signin",
+      provisionOnly:false
+    })
+  });
+  if(!response.ok){
+    const payload=await response.json().catch(()=>({}));
+    throw new Error(payload.message||"Could not connect this product session.");
+  }
+  window.location.assign(new URL("/dashboard",origin).toString());
 }
 function openProduct(product:string){
-  void supabase.auth.getSession().then(({data})=>{
+  void supabase.auth.getSession().then(async({data})=>{
     if(!data.session){
       window.location.assign(authRedirectUrl("signin"));
       return;
     }
-    window.location.assign(productHandoffUrl(data.session,product));
+    try{
+      await activateProductSession(data.session,product);
+    }catch(error){
+      console.error("Product session activation failed:",error);
+      window.location.assign(authRedirectUrl("signin"));
+    }
   });
 }
 function Brand({light=false}:{light?:boolean}){return <a className={"brand "+(light?"brand-light":"")} href="https://zenventora.in/"><img src={LOGO} alt="ZenVentora"/><span>ZENVENTORA</span></a>;}
