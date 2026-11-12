@@ -134,7 +134,13 @@ export default function App() {
   </section></AuthShell>;
 }
 
-function websiteHandoffUrl(session:Session){\n  const params=new URLSearchParams({access_token:session.access_token,refresh_token:session.refresh_token,type:"account_handoff"});\n  if(productContext){params.set("product",productContext);if(activeProductFlow==="signup")params.set("productFlow","signup");}\n  const target=new URL(accountWebsite);\n  target.hash=params.toString();\n  return target.toString();\n}
+function websiteHandoffUrl(session:Session){
+  const params=new URLSearchParams({access_token:session.access_token,refresh_token:session.refresh_token,type:"account_handoff"});
+  if(productContext){params.set("product",productContext);if(activeProductFlow==="signup")params.set("productFlow","signup");}
+  const target=new URL(accountWebsite);
+  target.hash=params.toString();
+  return target.toString();
+}
 function Brand({light=false}:{light?:boolean}){return <a className={"brand "+(light?"brand-light":"")} href="https://zenventora.in/"><img src={LOGO} alt="ZenVentora"/><span>ZENVENTORA</span></a>;}
 function AuthShell({children}:{children:ReactNode}){return <main className="auth-page"><div className="auth-glow"/><div className="auth-page-content">{children}</div></main>;}
 function Field({label,icon,children}:{label:string;icon:ReactNode;children:ReactNode}){return <label className="field"><span className="field-label">{label}</span><span className="input-shell"><span className="input-icon">{icon}</span>{children}</span></label>;}
