@@ -141,25 +141,34 @@ function websiteHandoffUrl(session:Session){
   target.hash=params.toString();
   return target.toString();
 }
-async function activateProductSession(session:Session,product:string){
+function activateProductSession(session:Session,product:string){
   const origin=PRODUCT_ORIGINS[product]||MAIN_SITE;
-  const response=await fetch(origin + "/api/auth/common/session",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    credentials:"include",
-    cache:"no-store",
-    body:JSON.stringify({
-      accessToken:session.access_token,
-      refreshToken:session.refresh_token,
-      productFlow:"signin",
-      provisionOnly:false
-    })
-  });
-  if(!response.ok){
-    const payload=await response.json().catch(()=>({}));
-    throw new Error(payload.message||"Could not connect this product session.");
+  // Use a top-level POST navigation instead of a cross-origin fetch.
+  // The product owns the session cookie, so the browser receives Set-Cookie
+  // directly from the product origin and then follows its server redirect.
+  const form=document.createElement("form");
+  form.method="POST";
+  form.action=new URL("/api/auth/common/session",origin).toString();
+  form.style.display="none";
+  const fields:{
+    name:string;
+    value:string;
+  }[]=[
+    {name:"accessToken",value:session.access_token},
+    {name:"refreshToken",value:session.refresh_token},
+    {name:"productFlow",value:"signin"},
+    {name:"provisionOnly",value:"false"},
+    {name:"handoffMode",value:"navigation"}
+  ];
+  for(const field of fields){
+    const input=document.createElement("input");
+    input.type="hidden";
+    input.name=field.name;
+    input.value=field.value;
+    form.appendChild(input);
   }
-  window.location.assign(new URL("/dashboard",origin).toString());
+  document.body.appendChild(form);
+  form.submit();
 }
 function openProduct(product:string){
   void supabase.auth.getSession().then(async({data})=>{
