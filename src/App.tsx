@@ -30,14 +30,6 @@ const returnTo = safeReturnOrigin(accountParams.get("returnTo"));
 const postLogoutTo = safeReturnOrigin(accountParams.get("postLogoutTo"));
 const forceSignout = accountParams.get("signout") === "1";
 const accountWebsite = returnTo || postLogoutTo || (productContext ? PRODUCT_ORIGINS[productContext] : MAIN_SITE);
-function productAccessUrl(product:string) {
-  const origin = PRODUCT_ORIGINS[product] || MAIN_SITE;
-  const url = new URL("https://accounts.zenventora.in/login");
-  url.searchParams.set("view", "signin");
-  url.searchParams.set("product", product);
-  url.searchParams.set("returnTo", origin);
-  return url.toString();
-}
 const signupWebsite = productContext === "emenu"
   ? "https://zenventora.in/emenu/signup.html"
   : "https://zenventora.in/signup.html";
