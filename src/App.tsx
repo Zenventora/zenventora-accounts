@@ -22,7 +22,7 @@ function safeReturnOrigin(value:string|null) {
   if (!value) return null;
   try {
     const parsed = new URL(value);
-    const allowed = [MAIN_SITE, ...Object.values(PRODUCT_ORIGINS), "https://vadix.onrender.com"];
+    const allowed = [MAIN_SITE, ...Object.values(PRODUCT_ORIGINS)];
     return allowed.includes(parsed.origin) ? parsed.toString() : null;
   } catch { return null; }
 }
