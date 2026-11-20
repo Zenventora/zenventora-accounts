@@ -12,7 +12,8 @@
     "https://www.zenventora.in",
     "https://emenu.zenventora.in",
     "https://siteradar.zenventora.in",
-    "https://vadix.zenventora.in"
+    "https://vadix.zenventora.in",
+    "https://vadix.onrender.com"
   ]);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -45,6 +46,9 @@
     if (!ALLOWED_PARENTS.has(event.origin) || event.source !== window.parent) return;
     if (event.data?.type === "zenventora:request-session") {
       sendSession(event.origin);
+    }
+    if (event.data?.type === "zenventora:signout") {
+      supabase.auth.signOut({ scope: "global" }).then(() => sendSession(event.origin));
     }
   });
 
